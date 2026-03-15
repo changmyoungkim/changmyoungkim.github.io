@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="ko" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cased — Every place has a story</title>
+  <meta name="description" content="AI-curated audio guides for 33,000+ places in 201 countries. GPS auto-play, any-theme tours, 25 languages.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            base: '#0a0a0a',
+            raised: '#111111',
+            subtle: '#1a1a1a',
+            primary: '#ff6933',
+            'primary-dim': 'rgba(255, 105, 51, 0.15)',
+            'text-primary': '#f0ece8',
+            'text-secondary': '#8a8480',
+            'domain-content': '#3b82f6',
+            'domain-activity': '#10b981',
+            'domain-case': '#6366f1',
+            'domain-grnd': '#ef4444',
+            'domain-food': '#f59e0b',
+            'domain-shopping': '#ec4899',
+            'domain-tour': '#8b5cf6',
+            'domain-heritage': '#ff6933',
+          },
+          fontFamily: {
+            display: ['"DM Serif Display"', 'serif'],
+            sans: ['"DM Sans"', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          },
+        },
+      },
+    }
+  </script>
+  <style>
+    body {
+      background: #0a0a0a;
+      color: #f0ece8;
+      font-family: 'DM Sans', sans-serif;
+    }
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+      background-size: 60px 60px;
+      pointer-events: none;
+      z-index: 0;
+    }
+    .section-divider {
+      width: 64px;
+      height: 1px;
+      background: rgba(255, 105, 51, 0.4);
+      margin: 0 auto 1.5rem;
+    }
+    @keyframes marker-pulse {
+      0% { transform: scale(0); opacity: 0; }
+      50% { transform: scale(1.2); opacity: 1; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    @keyframes marker-glow {
+      0%, 100% { box-shadow: 0 0 8px rgba(255, 105, 51, 0.3); }
+      50% { box-shadow: 0 0 20px rgba(255, 105, 51, 0.6); }
+    }
+    .marker {
+      animation: marker-pulse 0.6s ease-out forwards, marker-glow 2s ease-in-out infinite;
+      animation-delay: var(--delay, 0s), calc(var(--delay, 0s) + 0.6s);
+      opacity: 0;
+    }
+    @keyframes chip-in {
+      from { opacity: 0; transform: translateY(16px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .chip {
+      animation: chip-in 0.5s ease-out forwards;
+      animation-delay: var(--cd, 0s);
+      opacity: 0;
+    }
+    .reveal {
+      opacity: 0;
+      transform: translateY(30px);
+      transition: opacity 0.7s ease, transform 0.7s ease;
+    }
+    .reveal.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    .count-up { font-variant-numeric: tabular-nums; }
+    .coord {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: rgba(138, 132, 128, 0.3);
+      letter-spacing: 0.05em;
+    }
+    /* Phone frame */
+    .phone-frame {
+      position: relative;
+      width: 260px;
+      border-radius: 32px;
+      border: 3px solid rgba(255,255,255,0.1);
+      overflow: hidden;
+      box-shadow: 0 25px 50px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.05);
+      background: #111;
+    }
+    .phone-frame img {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+    /* Screenshot gallery scroll */
+    .screenshot-scroll {
+      display: flex;
+      gap: 20px;
+      overflow-x: auto;
+      scroll-snap-type: x mandatory;
+      -webkit-overflow-scrolling: touch;
+      padding: 0 20px 20px;
+      scrollbar-width: none;
+    }
+    .screenshot-scroll::-webkit-scrollbar { display: none; }
+    .screenshot-scroll .phone-frame {
+      scroll-snap-align: center;
+      flex-shrink: 0;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .marker, .chip { animation: none; opacity: 1; }
+      .reveal { transition: none; opacity: 1; transform: none; }
+    }
+  </style>
+</head>
+<body class="relative overflow-x-hidden">
+
+  <!-- ==================== HERO ==================== -->
+  <section class="relative min-h-screen flex items-center justify-center px-6" id="hero">
+    <div class="absolute inset-0 bg-base"></div>
+
+    <div class="relative z-20 text-center max-w-3xl mx-auto">
+      <p class="coord mb-8">37.5665° N, 126.9780° E</p>
+      <h1 class="font-display text-[clamp(42px,7vw,84px)] leading-[1.1] mb-6">
+        Every place has a story.
+      </h1>
+      <p class="text-text-secondary text-[clamp(16px,2vw,22px)] mb-4 max-w-xl mx-auto">
+        AI audio guides that play automatically as you walk.
+        <br class="hidden sm:block">
+        No searching. No tapping. Just listen.
+      </p>
+      <div class="flex items-center justify-center gap-6 font-mono text-sm text-text-secondary mt-8 mb-10">
+        <span><span class="text-primary text-2xl font-bold count-up" data-target="33000">0</span>+ places</span>
+        <span class="text-text-secondary/30">·</span>
+        <span><span class="text-primary text-2xl font-bold count-up" data-target="201">0</span> countries</span>
+        <span class="text-text-secondary/30">·</span>
+        <span><span class="text-primary text-2xl font-bold count-up" data-target="25">0</span> languages</span>
+      </div>
+      <p class="text-text-secondary text-sm mb-3">iOS & Android</p>
+      <span class="inline-block bg-white/10 border border-white/10 rounded-xl px-8 py-3 text-text-primary font-semibold">
+        Coming Soon
+      </span>
+    </div>
+
+    <div class="absolute bottom-8 left-1/2 -translate-x-1/2 z-20">
+      <div class="w-5 h-8 border-2 border-text-secondary/30 rounded-full flex justify-center">
+        <div class="w-1 h-2 bg-text-secondary/50 rounded-full mt-1.5 animate-bounce"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== ANY-THEME TOURS ==================== -->
+  <section class="relative py-24 md:py-40 px-6" id="tours">
+    <div class="max-w-5xl mx-auto">
+      <div class="reveal">
+        <div class="section-divider"></div>
+        <p class="coord text-center mb-4">48.8566° N, 2.3522° E</p>
+        <h2 class="font-display text-[clamp(28px,4vw,48px)] text-center mb-4">
+          Any story becomes a tour.
+        </h2>
+        <p class="text-text-secondary text-center text-lg mb-12 max-w-2xl mx-auto">
+          Enter any keyword — a movie, a musician, a historical figure, a local dish — and AI instantly curates a walking tour with every related place.
+        </p>
+      </div>
+
+      <!-- Keyword chips -->
+      <div class="flex flex-wrap justify-center gap-3 mb-16 reveal">
+        <span class="chip inline-block px-5 py-2.5 rounded-full border text-sm font-medium cursor-default transition-colors bg-domain-shopping/10 border-domain-shopping/40 text-domain-shopping hover:bg-domain-shopping/20" style="--cd:0.1s">Parasite</span>
+        <span class="chip inline-block px-5 py-2.5 rounded-full border text-sm font-medium cursor-default transition-colors bg-domain-content/10 border-domain-content/40 text-domain-content hover:bg-domain-content/20" style="--cd:0.18s">Beatles</span>
+        <span class="chip inline-block px-5 py-2.5 rounded-full border text-sm font-medium cursor-default transition-colors bg-domain-food/10 border-domain-food/40 text-domain-food hover:bg-domain-food/20" style="--cd:0.26s">Street Food Seoul</span>
+        <span class="chip inline-block px-5 py-2.5 rounded-full border text-sm font-medium cursor-default transition-colors bg-domain-heritage/10 border-domain-heritage/40 text-domain-heritage hover:bg-domain-heritage/20" style="--cd:0.34s">Joseon Palace</span>
+        <span class="chip inline-block px-5 py-2.5 rounded-full border text-sm font-medium cursor-default transition-colors bg-domain-tour/10 border-domain-tour/40 text-domain-tour hover:bg-domain-tour/20" style="--cd:0.42s">BTS</span>
+        <span class="chip inline-block px-5 py-2.5 rounded-full border text-sm font-medium cursor-default transition-colors bg-domain-activity/10 border-domain-activity/40 text-domain-activity hover:bg-domain-activity/20" style="--cd:0.50s">Seoul Pub Crawl</span>
+        <span class="chip inline-block px-5 py-2.5 rounded-full border text-sm font-medium cursor-default transition-colors bg-domain-case/10 border-domain-case/40 text-domain-case hover:bg-domain-case/20" style="--cd:0.58s">Napoleon</span>
+        <span class="chip inline-block px-5 py-2.5 rounded-full border text-sm font-medium cursor-default transition-colors bg-white/5 border-white/10 text-text-secondary hover:bg-white/10" style="--cd:0.66s">Anything you imagine…</span>
+      </div>
+
+      <!-- Tour screenshots gallery -->
+      <div class="reveal">
+        <div class="screenshot-scroll justify-center">
+          <div class="phone-frame">
+            <img src="img/tour-curation-player.jpg" alt="Tour curation with player and stops" loading="lazy">
+          </div>
+          <div class="phone-frame">
+            <img src="img/tour-stranger-things-search.jpg" alt="Stranger Things media search" loading="lazy">
+          </div>
+          <div class="phone-frame">
+            <img src="img/tour-curation-stops.jpg" alt="Tour curation with stops and map" loading="lazy">
+          </div>
+          <div class="phone-frame">
+            <img src="img/tour-night-cover2.jpg" alt="Special City Night Tour" loading="lazy">
+          </div>
+          <div class="phone-frame">
+            <img src="img/tour-stranger-things.jpg" alt="Stranger Things filming locations in Atlanta" loading="lazy">
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== MID CTA ==================== -->
+  <section class="py-16 px-6">
+    <div class="max-w-lg mx-auto text-center">
+      <p class="text-text-secondary mb-4">iOS & Android</p>
+      <span class="inline-block bg-white/10 border border-white/10 text-text-primary font-semibold rounded-xl px-8 py-3.5">
+        Coming Soon
+      </span>
+    </div>
+  </section>
+
+  <!-- ==================== SMART AUDIO GUIDE ==================== -->
+  <section class="relative py-24 md:py-40 px-6 bg-subtle/50" id="guide">
+    <div class="max-w-5xl mx-auto">
+      <div class="grid md:grid-cols-2 gap-16 items-center">
+        <div class="reveal">
+          <div class="section-divider md:mx-0"></div>
+          <p class="coord mb-4">41.8902° N, 12.4922° E</p>
+          <h2 class="font-display text-[clamp(28px,4vw,48px)] mb-6">
+            Walk. It plays.
+          </h2>
+          <p class="text-text-secondary text-lg mb-8">
+            Approach a landmark and Cased starts narrating — history, architecture, hidden stories.
+            No buttons. No menus. Just walk and listen.
+          </p>
+          <div class="space-y-4">
+            <div class="flex items-start gap-3">
+              <span class="w-1.5 h-1.5 rounded-full bg-primary mt-2.5 shrink-0"></span>
+              <p class="text-text-secondary">GPS detects your position and triggers the right story at the right moment</p>
+            </div>
+            <div class="flex items-start gap-3">
+              <span class="w-1.5 h-1.5 rounded-full bg-primary mt-2.5 shrink-0"></span>
+              <p class="text-text-secondary">Deep guides — not one-liners, but detailed narratives for every point of interest</p>
+            </div>
+            <div class="flex items-start gap-3">
+              <span class="w-1.5 h-1.5 rounded-full bg-primary mt-2.5 shrink-0"></span>
+              <p class="text-text-secondary">25 languages — AI voice guides in your language, anywhere in the world</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Real screenshots: guide + playing -->
+        <div class="reveal flex gap-4 justify-center items-start">
+          <div class="phone-frame" style="width:220px">
+            <img src="img/guide-changdeokgung2.jpg" alt="Changdeokgung guide with microspot map" loading="lazy">
+          </div>
+          <div class="phone-frame mt-12" style="width:220px">
+            <img src="img/guide-playing.jpg" alt="Audio guide playing with playlist" loading="lazy">
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== CASE + GRND ==================== -->
+  <section class="relative py-24 md:py-40 px-6" id="more">
+    <div class="max-w-5xl mx-auto">
+      <div class="reveal text-center mb-16">
+        <div class="section-divider"></div>
+        <h2 class="font-display text-[clamp(28px,4vw,48px)]">
+          More than a guide.
+        </h2>
+      </div>
+
+      <div class="grid md:grid-cols-2 gap-8">
+        <!-- Case -->
+        <div class="reveal bg-raised border border-domain-case/20 rounded-2xl p-8">
+          <div class="flex items-center gap-3 mb-4">
+            <div class="w-3 h-3 rounded-full bg-domain-case"></div>
+            <h3 class="font-display text-2xl">Case</h3>
+          </div>
+          <p class="text-text-secondary mb-6">
+            Leave a voice memo at a place. It can only be heard within 50 meters — a digital time capsule tied to a real location.
+          </p>
+          <div class="bg-base/50 rounded-xl p-4 border border-white/5">
+            <div class="flex items-center gap-3 mb-2">
+              <div class="w-8 h-8 rounded-full bg-domain-case/20 flex items-center justify-center text-domain-case text-xs">♪</div>
+              <div>
+                <p class="text-sm text-text-primary">Anonymous</p>
+                <p class="text-xs text-text-secondary">Namsan Tower · 2 days ago</p>
+              </div>
+            </div>
+            <p class="text-sm text-text-secondary italic">"Standing here reminds me why I moved to Seoul…"</p>
+          </div>
+        </div>
+
+        <!-- GRND -->
+        <div class="reveal bg-raised border border-domain-grnd/20 rounded-2xl p-8">
+          <div class="flex items-center gap-3 mb-4">
+            <div class="w-3 h-3 rounded-full bg-domain-grnd"></div>
+            <h3 class="font-display text-2xl">GRND</h3>
+          </div>
+          <p class="text-text-secondary mb-6">
+            The city is your playground. Digital activities that turn real streets into game spaces — solo or with friends, anytime, anywhere.
+          </p>
+          <!-- GRND screenshots -->
+          <div class="flex gap-3 justify-center">
+            <div class="phone-frame" style="width:130px">
+              <img src="img/grnd-list.jpg" alt="GRND game list" loading="lazy">
+            </div>
+            <div class="phone-frame" style="width:130px">
+              <img src="img/grnd-game-map.jpg" alt="GRND multiplayer game map in Ho Chi Minh City" loading="lazy">
+            </div>
+            <div class="phone-frame" style="width:130px">
+              <img src="img/map-grnd.jpg" alt="GRND on map" loading="lazy">
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== MAP + HUB SHOWCASE ==================== -->
+  <section class="py-24 md:py-32 px-6 bg-subtle/30" id="explore">
+    <div class="max-w-5xl mx-auto">
+      <div class="reveal text-center mb-12">
+        <div class="section-divider"></div>
+        <h2 class="font-display text-[clamp(28px,4vw,48px)] mb-4">Explore your way.</h2>
+        <p class="text-text-secondary text-lg max-w-2xl mx-auto">8 domains. One map. Filter by heritage, food, tours, content, activities, and more.</p>
+      </div>
+
+      <!-- Map & Hub screenshots -->
+      <div class="reveal">
+        <div class="screenshot-scroll justify-center">
+          <div class="phone-frame">
+            <img src="img/map-culture-photo.jpg" alt="Culture map with photos" loading="lazy">
+          </div>
+          <div class="phone-frame">
+            <img src="img/map-tour-wide.jpg" alt="Tour markers on map" loading="lazy">
+          </div>
+          <div class="phone-frame">
+            <img src="img/hub-home2.jpg" alt="Hub home with popular tours" loading="lazy">
+          </div>
+          <div class="phone-frame">
+            <img src="img/itinerary-list.jpg" alt="Itinerary list" loading="lazy">
+          </div>
+        </div>
+      </div>
+
+      <!-- Domain pills -->
+      <div class="reveal grid grid-cols-2 sm:grid-cols-4 gap-3 mt-12 max-w-3xl mx-auto">
+        <div class="flex items-center gap-2.5 px-4 py-3 rounded-xl bg-domain-heritage/10 border border-domain-heritage/20">
+          <span class="w-2 h-2 rounded-full bg-domain-heritage"></span>
+          <span class="text-sm text-text-primary">Heritage</span>
+        </div>
+        <div class="flex items-center gap-2.5 px-4 py-3 rounded-xl bg-domain-content/10 border border-domain-content/20">
+          <span class="w-2 h-2 rounded-full bg-domain-content"></span>
+          <span class="text-sm text-text-primary">Content</span>
+        </div>
+        <div class="flex items-center gap-2.5 px-4 py-3 rounded-xl bg-domain-activity/10 border border-domain-activity/20">
+          <span class="w-2 h-2 rounded-full bg-domain-activity"></span>
+          <span class="text-sm text-text-primary">Activity</span>
+        </div>
+        <div class="flex items-center gap-2.5 px-4 py-3 rounded-xl bg-domain-food/10 border border-domain-food/20">
+          <span class="w-2 h-2 rounded-full bg-domain-food"></span>
+          <span class="text-sm text-text-primary">Food</span>
+        </div>
+        <div class="flex items-center gap-2.5 px-4 py-3 rounded-xl bg-domain-shopping/10 border border-domain-shopping/20">
+          <span class="w-2 h-2 rounded-full bg-domain-shopping"></span>
+          <span class="text-sm text-text-primary">Shopping</span>
+        </div>
+        <div class="flex items-center gap-2.5 px-4 py-3 rounded-xl bg-domain-grnd/10 border border-domain-grnd/20">
+          <span class="w-2 h-2 rounded-full bg-domain-grnd"></span>
+          <span class="text-sm text-text-primary">GRND</span>
+        </div>
+        <div class="flex items-center gap-2.5 px-4 py-3 rounded-xl bg-domain-tour/10 border border-domain-tour/20">
+          <span class="w-2 h-2 rounded-full bg-domain-tour"></span>
+          <span class="text-sm text-text-primary">Tour</span>
+        </div>
+        <div class="flex items-center gap-2.5 px-4 py-3 rounded-xl bg-domain-case/10 border border-domain-case/20">
+          <span class="w-2 h-2 rounded-full bg-domain-case"></span>
+          <span class="text-sm text-text-primary">Case</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== ABOUT ==================== -->
+  <section class="py-24 md:py-32 px-6" id="about">
+    <div class="max-w-3xl mx-auto">
+      <div class="reveal text-center mb-12">
+        <div class="section-divider"></div>
+        <h2 class="font-display text-[clamp(28px,4vw,48px)]">About Cased</h2>
+      </div>
+      <div class="reveal text-center">
+        <p class="text-text-secondary text-lg leading-relaxed mb-8">
+          Cased is built by IAI, a Seoul-based startup on a mission to make every place in the world explainable.
+          We believe cultural knowledge should be accessible to everyone — regardless of language, budget, or where you come from.
+        </p>
+        <p class="text-text-secondary text-lg leading-relaxed mb-12">
+          One engineer built the entire platform: backend, mobile app, AI pipeline, and a database spanning 201 countries.
+          We ship fast, think global, and let AI do the heavy lifting.
+        </p>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-6 font-mono text-center">
+          <div>
+            <p class="text-primary text-2xl font-bold">2022</p>
+            <p class="text-text-secondary text-xs mt-1">Founded</p>
+          </div>
+          <div>
+            <p class="text-primary text-2xl font-bold">Seoul</p>
+            <p class="text-text-secondary text-xs mt-1">Headquarters</p>
+          </div>
+          <div>
+            <p class="text-primary text-2xl font-bold">198</p>
+            <p class="text-text-secondary text-xs mt-1">API Endpoints</p>
+          </div>
+          <div>
+            <p class="text-primary text-2xl font-bold">1</p>
+            <p class="text-text-secondary text-xs mt-1">Engineer</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== FOOTER CTA ==================== -->
+  <footer class="py-24 md:py-32 px-6 text-center" id="download">
+    <div class="max-w-2xl mx-auto">
+      <div class="reveal">
+        <h2 class="font-display text-[clamp(28px,4vw,48px)] mb-4">
+          Wherever you go next.
+        </h2>
+        <p class="text-text-secondary text-lg mb-10">Cased is already there.</p>
+
+        <div class="flex items-center justify-center gap-6 font-mono text-sm text-text-secondary mb-10">
+          <span><span class="text-text-primary font-bold">33,000+</span> places</span>
+          <span class="text-text-secondary/30">·</span>
+          <span><span class="text-text-primary font-bold">201</span> countries</span>
+          <span class="text-text-secondary/30">·</span>
+          <span><span class="text-text-primary font-bold">25</span> languages</span>
+        </div>
+
+        <p class="text-text-secondary text-sm mb-4">iOS & Android</p>
+        <div class="flex items-center justify-center gap-4 flex-wrap mb-16">
+          <span class="inline-block bg-white/10 border border-white/10 text-text-primary font-semibold rounded-xl px-8 py-3.5">
+            Coming Soon
+          </span>
+        </div>
+
+        <div class="flex items-center justify-center gap-6 text-sm text-text-secondary">
+          <a href="mailto:humblecmk@gmail.com" class="hover:text-text-primary transition-colors">Contact</a>
+          <span class="text-text-secondary/30">·</span>
+          <span>&copy; 2026 IAI</span>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) entry.target.classList.add('visible');
+      });
+    }, { threshold: 0.15 });
+    document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+
+    const countObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          const el = entry.target;
+          const target = parseInt(el.dataset.target);
+          const duration = 1500;
+          const start = performance.now();
+          function update(now) {
+            const elapsed = now - start;
+            const progress = Math.min(elapsed / duration, 1);
+            const eased = 1 - Math.pow(1 - progress, 3);
+            el.textContent = Math.floor(target * eased).toLocaleString();
+            if (progress < 1) requestAnimationFrame(update);
+          }
+          requestAnimationFrame(update);
+          countObserver.unobserve(el);
+        }
+      });
+    }, { threshold: 0.5 });
+    document.querySelectorAll('.count-up').forEach(el => countObserver.observe(el));
+  </script>
+
+</body>
+</html>
